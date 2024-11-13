@@ -13,7 +13,6 @@ export default class Media {
   public initialized: boolean = false
 
   /**
-   *
    * @param path
    * @param startTime time in milliseconds
    * @param hasVideo
@@ -28,9 +27,6 @@ export default class Media {
   }
 
   init(): PromiseLike<any> {
-
-    // TODO not looking for stream channels if doesn't contain audio.
-    // Would it work with just audio files?
     return new Promise((resolve, reject) => {
       Promise.all([this.getEntry('format=duration'), this.hasAudio ? this.getEntry('stream=channels') : '-1'])
         .then(([duration, channels]) => {
@@ -54,17 +50,14 @@ export default class Media {
       const command = `ffprobe -v error -show_entries ${entry} -of default=noprint_wrappers=1:nokey=1 "${this.path}"`
       const ls = spawn(command, [], { shell: true })
       ls.stdout.on('data', data => {
-        if (log) console.log(`stdout: ${data}`)
         resolve(data)
       })
 
       ls.stderr.on('data', data => {
-        if (log) console.log(`stderr: ${data}`)
         reject(data)
       })
 
       ls.on('error', (error) => {
-        if (log) console.log(`error: ${error.message}`)
         reject(error)
       })
 

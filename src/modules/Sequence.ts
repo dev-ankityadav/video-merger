@@ -3,29 +3,32 @@ import SequenceStep from './SequenceStep'
 import CommandExecutor from './CommandExecutor'
 import User from './User'
 
-
 export default class Sequence {
   public mediaList: Media[]
-  public sequenceSteps:SequenceStep[] = []
+  public sequenceSteps: SequenceStep[] = []
   public outputVideo: Media
   public layout: VideoLayout
   public encodingOptions: EncodingOptions
-  constructor(users:User[]=[], outputVideo:Media, layout:VideoLayout, encOpt?: EncodingOptions) {
+
+  constructor(users: User[] = [], outputVideo: Media, layout: VideoLayout, encOpt?: EncodingOptions) {
     this.mediaList = []
     users.forEach(user => {
       this.mediaList.push(...user.media)
     })
 
-    const defaultEncodingOptions:EncodingOptions = {
-      size:{w:1280,h:720},
-      crf:22
+    const defaultEncodingOptions: EncodingOptions = {
+      size: { w: 1280, h: 720 },
+      crf: 22
     }
-    if(encOpt && encOpt.crf && encOpt.bitrate) throw new Error('cannot use bitrate and crf simultaneously')
-    const encoding:EncodingOptions = {
-      size: encOpt?encOpt.size:defaultEncodingOptions.size,
-      loglevel: encOpt?.loglevel
+
+    if (encOpt && encOpt.crf && encOpt.bitrate) throw new Error('cannot use bitrate and crf simultaneously')
+
+    const encoding: EncodingOptions = {
+      size: encOpt ? encOpt.size : defaultEncodingOptions.size,
+      logLevel: encOpt?.logLevel
     }
-    if(!encOpt?.crf && !encOpt?.bitrate) {
+
+    if (!encOpt?.crf && !encOpt?.bitrate) {
       encoding.crf = defaultEncodingOptions.crf
     } else {
       encoding.crf = encOpt?.crf
@@ -38,103 +41,99 @@ export default class Sequence {
     this.layout = layout
   }
 
-  addVideo(video:Media):void {
+  addVideo(video: Media): void {
     this.mediaList.push(video)
   }
 
-  encode():Promise<any> {
+  async encode(): Promise<any> {
     console.log('start encoding')
-    return this.generateCommand().then(([filter,command]) => {
-      return CommandExecutor.pipeExec(filter,command,true)
+    const [filter, command] = await this.generateCommand()
+    return await CommandExecutor.pipeExec(filter, command)
+  }
+
+  private async createSequenceSteps(): Promise<any> {
+    // check videos
+    try {
+      await this.mediaList.reduce(async (p: Promise<void>, med: Media) => p.then(() => med.initialized ? Promise.resolve() : med.init()), Promise.resolve())
+    } catch (err) {
+      console.log('error initializing video files', err)
+      throw err
+    }
+
+    // Order videos
+    this.mediaList.sort((a, b) => a.startTime > b.startTime ? 1 : (a.startTime === b.startTime ? 0 : -1)).forEach((vid, index) => vid.setId(index))
+
+    const queue: MediaPoint[] = [];
+
+    this.mediaList.forEach(vid_1 => {
+      queue.push({
+        start_point: true,
+        time: vid_1.startTime,
+        media_id: vid_1.id
+      })
+      queue.push({
+        start_point: false,
+        time: vid_1.startTime + vid_1.duration,
+        media_id: vid_1.id
+      })
+    })
+
+    queue.sort((a_1: MediaPoint, b_1: MediaPoint) => a_1.time < b_1.time ? 1 : (a_1.time === b_1.time ? 0 : -1))
+
+    console.log(`\n---- sort queue -----\n`, queue)
+
+    // building sequences
+    let prevTime: number = -1
+    const currentVideos: Media[] = []
+    this.sequenceSteps = []
+
+    while (queue.length > 0) {
+      // @ts-ignore
+      const point: MediaPoint = queue.pop()
+
+      if ((queue.length === 0 || point.time !== prevTime) && prevTime !== -1 && currentVideos.length >= 0) {
+        const step: SequenceStep = new SequenceStep(`Seq${this.sequenceSteps.length}`, [...currentVideos], prevTime, point.time, this.encodingOptions.size, this.layout)
+        this.sequenceSteps.push(step)
+      }
+
+      if (point.start_point) {
+        currentVideos.push(this.mediaList[point.media_id])
+      } else {
+        const index_1: number = currentVideos.findIndex(vid_2 => vid_2.id === point.media_id)
+        currentVideos.splice(index_1, 1)
+      }
+
+      prevTime = point.time
+    }
+
+    console.log('\n---- Videos ----')
+    this.mediaList.forEach(vid_3 => console.log('id', vid_3.id, 'start', vid_3.startTime, 'len', vid_3.duration, 'achan', vid_3.audioChannels, vid_3.path))
+    console.log('output:', this.outputVideo.path)
+
+    console.log('\n---- Sequences ----')
+    this.sequenceSteps.forEach(step_1 => {
+      console.log(step_1.id, 'v:', '[' + step_1.mediaList.map(vid_4 => vid_4.id.toString()).join(',') + ']', 'start', step_1.startTime, 'end', step_1.startTime + step_1.duration, 'len', step_1.duration)
     })
   }
 
-  private createSequenceSteps():Promise<any> {
-
-    // check videos
-    return this.mediaList
-        .reduce(async (p: Promise<void>, med: Media) => p.then(() => med.initialized?Promise.resolve():med.init()), Promise.resolve())
-        .catch(err => {
-          console.log('error initializing video files', err)
-          throw err
-        }).then(() => {
-      // Order videos
-          this.mediaList
-          .sort((a,b) => a.startTime > b.startTime?1:(a.startTime===b.startTime?0:-1))
-          .forEach((vid, index) => vid.setId(index))
-
-          interface MediaPoint {
-            start_point: boolean
-            time: number
-            media_id: number
-          }
-
-          const queue:MediaPoint[] = []
-          this.mediaList.forEach(vid => {
-            queue.push({
-              start_point: true,
-              time: vid.startTime,
-              media_id: vid.id
-            })
-            queue.push({
-              start_point: false,
-              time: vid.startTime + vid.duration,
-              media_id: vid.id
-            })
-          })
-
-          queue.sort((a:MediaPoint,b:MediaPoint) => a.time < b.time?1:(a.time===b.time?0:-1))
-
-          console.log(`\n---- sort queue -----\n`, queue)
-
-      // building sequences
-
-          let prevTime:number = -1
-          const currentVideos:Media[] = []
-          this.sequenceSteps = []
-          while(queue.length > 0) {
-        // @ts-ignore
-            const point:MediaPoint = queue.pop()
-            if((queue.length === 0 || point.time !== prevTime) && prevTime !== -1 && currentVideos.length >= 0) {
-              const step:SequenceStep = new SequenceStep(`Seq${this.sequenceSteps.length}`,[...currentVideos],prevTime, point.time,this.encodingOptions.size, this.layout)
-              this.sequenceSteps.push(step)
-            }
-            if(point.start_point) {
-              currentVideos.push(this.mediaList[point.media_id])
-            } else {
-              const index:number = currentVideos.findIndex(vid=> vid.id===point.media_id)
-              currentVideos.splice(index,1)
-            }
-            prevTime = point.time
-          }
-          console.log('\n---- Videos ----')
-          this.mediaList.forEach(vid => console.log('id', vid.id, 'start', vid.startTime, 'len', vid.duration, 'achan', vid.audioChannels, vid.path))
-          console.log('output:',this.outputVideo.path)
-          console.log('\n---- Sequences ----')
-          this.sequenceSteps.forEach(step => {
-            console.log(step.id, 'v:', '[' + step.mediaList.map(vid => vid.id.toString()).join(',') + ']', 'start', step.startTime,'end', step.startTime + step.duration, 'len',step.duration)
-          })
-        })
-  }
-  
-  async generateCommand():Promise<string[]> {
+  async generateCommand(): Promise<string[]> {
     await this.createSequenceSteps()
 
-    const command:string[] = []
+    const command: string[] = []
 
-    const logging:string = this.encodingOptions.loglevel?`-v ${this.encodingOptions.loglevel}`:`-v quiet -stats`
+    const logging: string = this.encodingOptions.logLevel ? `-v ${this.encodingOptions.logLevel}` : `-v quiet -stats`
 
     command.push(`ffmpeg ${logging} `)
     command.push(this.mediaList.map(video => `-i "${video.path}"`).join(' ') + ' ')
     command.push(`-filter_complex_script `)
     command.push('pipe:0 ')
-    const quality:string = this.encodingOptions.crf?`-crf ${this.encodingOptions.crf}`:`-b:v ${this.encodingOptions.bitrate}`
+    const quality: string = this.encodingOptions.crf ? `-crf ${this.encodingOptions.crf}` : `-b:v ${this.encodingOptions.bitrate}`
     command.push(`-c:v libx264 ${quality} -preset fast -map [vid] -map [aud] -y "${this.outputVideo.path}"`)
 
-    const filter:string[] = []
+    const filter: string[] = []
     filter.push(`${this.sequenceSteps.map(step => step.generateFilter()).join('')}`)
     filter.push(`${this.sequenceSteps.map(step => `[${step.id}_out_v][${step.id}_out_a]`).join('')}concat=n=${this.sequenceSteps.length}:v=1:a=1[vid][aud]`)
 
-    return Promise.all([filter.join(''),command.join('')])
+    return Promise.all([filter.join(''), command.join('')])
   }
 }

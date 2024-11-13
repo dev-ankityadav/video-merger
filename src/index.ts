@@ -1,6 +1,6 @@
 import Media from './modules/Media'
 import Sequence from './modules/Sequence'
 import User from './modules/User'
-import Layouts from './modules/layouts'
+import PresenterLayout from './modules/PresenterLayout'
 
-export {Media,User,Sequence, Layouts}
+export { Media, User, Sequence, PresenterLayout }

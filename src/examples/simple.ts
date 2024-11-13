@@ -1,25 +1,25 @@
 import path from 'path'
-import { User, Layouts, Sequence, Media } from '../index'
-const { PresenterLayout, GridLayout, MosaicLayout } = Layouts
+import { User, PresenterLayout, Sequence, Media } from '../index'
 
-function basicEncode(encode: boolean = true) {
+function basicEncode() {
   // GET LIST OF MEDIA PER USER
   const videoFolder = path.join(__dirname, '../../videos')
 
   const user1Media: Media[] = [
     new Media(path.join(videoFolder, 'vid1.mp4'), 0, true, true),
-    new Media(path.join(videoFolder, 'vid2.mp4'), 0, true, true),
-    new Media(path.join(videoFolder, 'vid3.mp4'), 0, true, true),
-    new Media(path.join(videoFolder, 'vid1.mp4'), 0, true, true),
-    new Media(path.join(videoFolder, 'vid2.mp4'), 0, true, true)
+    new Media(path.join(videoFolder, 'vid2.mp4'), 2000, true, true),
+    new Media(path.join(videoFolder, 'vid3.mp4'), 4000, true, true),
+    new Media(path.join(videoFolder, 'vid1.mp4'), 6000, true, true),
+    new Media(path.join(videoFolder, 'vid2.mp4'), 8000, true, true)
   ]
 
   const user2Media: Media[] = [
-    new Media(path.join(videoFolder, 'vid3.mp4'), 0, true, true),
-    new Media(path.join(videoFolder, 'vid1.mp4'), 0, true, true),
-    new Media(path.join(videoFolder, 'vid2.mp4'), 0, true, true),
-    new Media(path.join(videoFolder, 'vid3.mp4'), 0, true, true)
+    new Media(path.join(videoFolder, 'vid3.mp4'), 10000, true, true),
+    new Media(path.join(videoFolder, 'vid1.mp4'), 12000, true, true),
+    new Media(path.join(videoFolder, 'vid2.mp4'), 14000, true, true),
+    new Media(path.join(videoFolder, 'vid3.mp4'), 16000, true, true)
   ]
+
   // CREATE USERS WITH THEIR MEDIA FILES
   const users: User[] = [
     new User('user1', user1Media, 'John'),
@@ -31,7 +31,7 @@ function basicEncode(encode: boolean = true) {
   const outputMedia: Media = new Media(path.join(videoFolder, 'basicOutput.mp4'), -1, true, true)
   const encodingOptions: EncodingOptions = {
     crf: 20,
-    loglevel: 'verbose',
+    logLevel: 'verbose',
     size: {
       w: 1280,
       h: 720
@@ -43,7 +43,7 @@ function basicEncode(encode: boolean = true) {
 
   // ENCODE THE SEQUENCE
   sequence.encode().then(comm => {
-    console.log(comm)
+    console.log("Encoding Done", comm);
   })
 }
 
