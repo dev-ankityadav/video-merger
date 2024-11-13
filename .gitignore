@@ -1,3 +1,4 @@
 node_modules/
 dist/
 videos/basicOutput.mp4
+lib/
