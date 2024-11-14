@@ -7,17 +7,17 @@ function basicEncode() {
 
   const user1Media: Media[] = [
     new Media(path.join(videoFolder, 'vid1.mp4'), 0, true, true),
-    new Media(path.join(videoFolder, 'vid2.mp4'), 2000, true, true),
-    new Media(path.join(videoFolder, 'vid3.mp4'), 4000, true, true),
-    new Media(path.join(videoFolder, 'vid1.mp4'), 6000, true, true),
-    new Media(path.join(videoFolder, 'vid2.mp4'), 8000, true, true)
+    new Media(path.join(videoFolder, 'vid2.mp4'), 2000, false, true, true),
+    // new Media(path.join(videoFolder, 'vid3.mp4'), 4000, true, true),
+    // new Media(path.join(videoFolder, 'vid1.mp4'), 6000, true, true),
+    // new Media(path.join(videoFolder, 'vid2.mp4'), 8000, true, true)
   ]
 
   const user2Media: Media[] = [
     new Media(path.join(videoFolder, 'vid3.mp4'), 10000, true, true),
-    new Media(path.join(videoFolder, 'vid1.mp4'), 12000, true, true),
-    new Media(path.join(videoFolder, 'vid2.mp4'), 14000, true, true),
-    new Media(path.join(videoFolder, 'vid3.mp4'), 16000, true, true)
+    // new Media(path.join(videoFolder, 'vid1.mp4'), 12000, true, true),
+    // new Media(path.join(videoFolder, 'vid2.mp4'), 14000, true, true),
+    // new Media(path.join(videoFolder, 'vid3.mp4'), 16000, true, true)
   ]
 
   // CREATE USERS WITH THEIR MEDIA FILES
@@ -40,6 +40,11 @@ function basicEncode() {
 
   // CREATE A SEQUENCE WITH GIVEN SETTINGS
   const sequence: Sequence = new Sequence(users, outputMedia, videoLayout, encodingOptions)
+
+  // ADD VIDEOS TO THE SEQUENCE
+  // let newMedia = new Media(path.join(videoFolder, 'vid1.mp4'), 2000, false, true, true);
+  // new User("user3Media", [newMedia], "Test")
+  // sequence.addVideo(newMedia)
 
   // ENCODE THE SEQUENCE
   sequence.encode().then(comm => {

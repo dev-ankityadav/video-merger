@@ -45,17 +45,16 @@ export default class Sequence {
     this.mediaList.push(video)
   }
 
-  async encode(): Promise<any> {
+  async encode(logsEnable: boolean = false): Promise<any> {
     console.log('start encoding')
-    const command = await this.generateCommand()
-    console.log('\n---- Command ---- \n', command)
-    return await CommandExecutor.execute(command, true)
+    const command = await this.generateCommand(logsEnable)
+    return await CommandExecutor.execute(command, logsEnable)
   }
 
-  private async createSequenceSteps(): Promise<any> {
+  private async createSequenceSteps(logsEnable: boolean): Promise<any> {
     // check videos
     try {
-      await this.mediaList.reduce(async (p: Promise<void>, med: Media) => p.then(() => med.initialized ? Promise.resolve() : med.init()), Promise.resolve())
+      await this.mediaList.reduce(async (p: Promise<void>, med: Media) => p.then(() => med.initialized ? Promise.resolve() : med.init(logsEnable)), Promise.resolve())
     } catch (err) {
       console.log('error initializing video files', err)
       throw err
@@ -81,7 +80,7 @@ export default class Sequence {
 
     queue.sort((a_1: MediaPoint, b_1: MediaPoint) => a_1.time < b_1.time ? 1 : (a_1.time === b_1.time ? 0 : -1))
 
-    console.log(`\n---- sort queue -----\n`, queue)
+    if (logsEnable) console.log(`\n---- sort queue -----\n`, queue)
 
     // building sequences
     let prevTime: number = -1
@@ -107,18 +106,20 @@ export default class Sequence {
       prevTime = point.time
     }
 
-    console.log('\n---- Videos ----')
-    this.mediaList.forEach(vid_3 => console.log('id', vid_3.id, 'start', vid_3.startTime, 'len', vid_3.duration, 'achan', vid_3.audioChannels, vid_3.path))
-    console.log('output:', this.outputVideo.path)
+    if (logsEnable) {
+      console.log('\n---- Videos ----')
+      this.mediaList.forEach(vid_3 => console.log('id', vid_3.id, 'start', vid_3.startTime, 'len', vid_3.duration, 'achan', vid_3.audioChannels, vid_3.path))
+      console.log('output:', this.outputVideo.path)
 
-    console.log('\n---- Sequences ----')
-    this.sequenceSteps.forEach(step_1 => {
-      console.log(step_1.id, 'v:', '[' + step_1.mediaList.map(vid_4 => vid_4.id.toString()).join(',') + ']', 'start', step_1.startTime, 'end', step_1.startTime + step_1.duration, 'len', step_1.duration)
-    })
+      console.log('\n---- Sequences ----')
+      this.sequenceSteps.forEach(step_1 => {
+        console.log(step_1.id, 'v:', '[' + step_1.mediaList.map(vid_4 => vid_4.id.toString()).join(',') + ']', 'start', step_1.startTime, 'end', step_1.startTime + step_1.duration, 'len', step_1.duration)
+      })
+    }
   }
 
-  async generateCommand(addText: boolean = false): Promise<string> {
-    await this.createSequenceSteps();
+  async generateCommand(logsEnable: boolean, addText: boolean = false): Promise<string> {
+    await this.createSequenceSteps(logsEnable);
 
     // Construct filter complex string
     const filters = this.sequenceSteps.map(step => step.generateFilter()).join('');

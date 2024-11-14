@@ -6,17 +6,15 @@ export default class SequenceStep {
   public readonly startTime: number
   public readonly duration: number
   public readonly size: Size
-  public readonly addText: boolean
   private readonly layout: VideoLayout
 
-  constructor(id: string, mediaList: Media[], startTime: number, endTime: number, size: Size, layout: VideoLayout, addText: boolean = true) {
+  constructor(id: string, mediaList: Media[], startTime: number, endTime: number, size: Size, layout: VideoLayout) {
     this.id = id
     this.mediaList = mediaList
     this.startTime = startTime
     this.duration = endTime - startTime
     this.size = size
     this.layout = layout
-    this.addText = addText;
     if (mediaList.length === 0) throw new Error('At least one video must be added to the sequence')
   }
 
@@ -47,7 +45,7 @@ export default class SequenceStep {
       out.push(`scale=w='if(gt(iw/ih,${box.w}/(${box.h})),${box.w},-2)':h='if(gt(iw/ih,${box.w}/(${box.h})),-2,${box.h})':eval=init[${this.id}_${vid.id}_v];`)
 
       //Add text on video
-      if (this.addText) {
+      if (vid.addText) {
         out.push(`[${this.id}_${vid.id}_v]drawtext=text='${vid.user?.name}':fontfile='arial.ttf':x=(w-text_w)-10:y=(h-text_h)-10:fontcolor=white:fontsize=24[${this.id}_${vid.id}_v_text];`)
       }
     })
@@ -55,10 +53,10 @@ export default class SequenceStep {
     // ---------------- OVERLAY VIDEOS ----------------------- //
     let prevVideoId: number = -1
     videoList.forEach((vid, ind) => {
-      const box = boxes[ind]
-      let keyOut: string
+      const box = boxes[ind];
 
       // set as output of sequence step if last video in list
+      let keyOut: string
       if (ind + 1 === videoList.length) {
         keyOut = `${this.id}_out_v`
       } else {
@@ -73,8 +71,9 @@ export default class SequenceStep {
         keyIn = `${this.id}_overlay_${prevVideoId}`
       }
 
+      // set key if want text on video
       let customVideoKey: string
-      if (this.addText) {
+      if (vid.addText) {
         customVideoKey = `[${keyIn}][${this.id}_${vid.id}_v_text]`
       } else {
         customVideoKey = `[${keyIn}][${this.id}_${vid.id}_v]`
@@ -114,7 +113,6 @@ export default class SequenceStep {
     if (audioList.length > 0) {
       out.push(`${inputList}amerge=inputs=${audioList.length},pan='stereo|c0<${c0}|c1<${c1}'[${this.id}_out_a];`)
     } else {
-      // TODO what sample rate to choose? Maybe need to convert all sample rates of files before concat
       out.push(`anullsrc=r=48000:cl=stereo,atrim=0:${this.duration / 1000},asetpts=PTS-STARTPTS[${this.id}_out_a];`)
     }
 
