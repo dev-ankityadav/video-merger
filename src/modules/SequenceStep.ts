@@ -6,15 +6,17 @@ export default class SequenceStep {
   public readonly startTime: number
   public readonly duration: number
   public readonly size: Size
+  public readonly addText: boolean
   private readonly layout: VideoLayout
 
-  constructor(id: string, mediaList: Media[], startTime: number, endTime: number, size: Size, layout: VideoLayout) {
+  constructor(id: string, mediaList: Media[], startTime: number, endTime: number, size: Size, layout: VideoLayout, addText: boolean = true) {
     this.id = id
     this.mediaList = mediaList
     this.startTime = startTime
     this.duration = endTime - startTime
     this.size = size
     this.layout = layout
+    this.addText = addText;
     if (mediaList.length === 0) throw new Error('At least one video must be added to the sequence')
   }
 
@@ -38,11 +40,16 @@ export default class SequenceStep {
       if (vid.hasVideo) {
         out.push(`[${vid.id}:v]trim=${(this.startTime - vid.startTime) / 1000}:${(this.duration + this.startTime - vid.startTime) / 1000},setpts=PTS-STARTPTS,`)
       } else {
-        out.push(`color=s=${this.size.w}x${this.size.h}:c=green@1.0,trim=0:${this.duration / 1000},drawtext=text='${vid.user?.name}':x=(w-tw)/2:y=((h-th)/2):fontcolor=black:fontsize=55,`)
+        out.push(`color=s=${this.size.w}x${this.size.h}:c=green@1.0,trim=0:${this.duration / 1000},drawtext=text='${vid.user?.name}':fontfile='arial.ttf':x=(w-tw)/2:y=((h-th)/2):fontcolor=black:fontsize=55,`)
       }
 
       // scale fit in box
       out.push(`scale=w='if(gt(iw/ih,${box.w}/(${box.h})),${box.w},-2)':h='if(gt(iw/ih,${box.w}/(${box.h})),-2,${box.h})':eval=init[${this.id}_${vid.id}_v];`)
+
+      //Add text on video
+      if (this.addText) {
+        out.push(`[${this.id}_${vid.id}_v]drawtext=text='${vid.user?.name}':fontfile='arial.ttf':x=(w-text_w)-10:y=(h-text_h)-10:fontcolor=white:fontsize=24[${this.id}_${vid.id}_v_text];`)
+      }
     })
 
     // ---------------- OVERLAY VIDEOS ----------------------- //
@@ -66,7 +73,14 @@ export default class SequenceStep {
         keyIn = `${this.id}_overlay_${prevVideoId}`
       }
 
-      out.push(`[${keyIn}][${this.id}_${vid.id}_v]overlay=x='(${box.w}-w)/2+${box.x}':y='(${box.h}-h)/2+${box.y}':eval=init${prevVideoId === -1 ? ':shortest=1' : ''}[${keyOut}];`)
+      let customVideoKey: string
+      if (this.addText) {
+        customVideoKey = `[${keyIn}][${this.id}_${vid.id}_v_text]`
+      } else {
+        customVideoKey = `[${keyIn}][${this.id}_${vid.id}_v]`
+      }
+
+      out.push(`${customVideoKey}overlay=x='(${box.w}-w)/2+${box.x}':y='(${box.h}-h)/2+${box.y}':eval=init${prevVideoId === -1 ? ':shortest=1' : ''}[${keyOut}];`)
 
       prevVideoId = vid.id
     })

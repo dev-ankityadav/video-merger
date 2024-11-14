@@ -47,8 +47,9 @@ export default class Sequence {
 
   async encode(): Promise<any> {
     console.log('start encoding')
-    const [filter, command] = await this.generateCommand()
-    return await CommandExecutor.pipeExec(filter, command)
+    const command = await this.generateCommand()
+    console.log('\n---- Command ---- \n', command)
+    return await CommandExecutor.execute(command, true)
   }
 
   private async createSequenceSteps(): Promise<any> {
@@ -116,24 +117,41 @@ export default class Sequence {
     })
   }
 
-  async generateCommand(): Promise<string[]> {
-    await this.createSequenceSteps()
+  async generateCommand(addText: boolean = false): Promise<string> {
+    await this.createSequenceSteps();
 
-    const command: string[] = []
+    // Construct filter complex string
+    const filters = this.sequenceSteps.map(step => step.generateFilter()).join('');
+    const concatSection = `${this.sequenceSteps.map(step => `[${step.id}_out_v][${step.id}_out_a]`).join('')}concat=n=${this.sequenceSteps.length}:v=1:a=1[vid][aud];`
+    const textSection = `[vid]drawtext=text='Meeting':fontfile='arial.ttf':x=(w-text_w)-10:y=(h-text_h)-10:fontcolor=white:fontsize=24[vid_with_text]`;
 
-    const logging: string = this.encodingOptions.logLevel ? `-v ${this.encodingOptions.logLevel}` : `-v quiet -stats`
+    let filterComplex: string = '';
+    if (addText) {
+      filterComplex = `${filters}${concatSection}${textSection}`;
+    } else {
+      filterComplex = `${filters}${concatSection}`;
+    }
 
-    command.push(`ffmpeg ${logging} `)
-    command.push(this.mediaList.map(video => `-i "${video.path}"`).join(' ') + ' ')
-    command.push(`-filter_complex_script `)
-    command.push('pipe:0 ')
-    const quality: string = this.encodingOptions.crf ? `-crf ${this.encodingOptions.crf}` : `-b:v ${this.encodingOptions.bitrate}`
-    command.push(`-c:v libx264 ${quality} -preset fast -map [vid] -map [aud] -y "${this.outputVideo.path}"`)
+    // Configure logging options
+    const logging = this.encodingOptions.logLevel ? `-v ${this.encodingOptions.logLevel}` : `-v quiet -stats`;
 
-    const filter: string[] = []
-    filter.push(`${this.sequenceSteps.map(step => step.generateFilter()).join('')}`)
-    filter.push(`${this.sequenceSteps.map(step => `[${step.id}_out_v][${step.id}_out_a]`).join('')}concat=n=${this.sequenceSteps.length}:v=1:a=1[vid][aud]`)
+    // Configure quality options
+    const quality = this.encodingOptions.crf ? `-crf ${this.encodingOptions.crf}` : `-b:v ${this.encodingOptions.bitrate}`;
 
-    return Promise.all([filter.join(''), command.join('')])
+    // Construct FFmpeg command
+    const commandParts: string[] = [
+      `ffmpeg ${logging}`,
+      this.mediaList.map(video => `-i "${video.path}"`).join(' '),
+      `-filter_complex "${filterComplex}"`,
+      `-c:v libx264 ${quality} -preset fast`,
+    ];
+    if (addText) {
+      commandParts.push(`-map [vid_with_text] -map [aud] -y "${this.outputVideo.path}"`)
+    } else {
+      commandParts.push(`-map [vid] -map [aud] -y "${this.outputVideo.path}"`)
+    }
+
+    // Return the assembled command as a single string
+    return commandParts.join(' ');
   }
 }
